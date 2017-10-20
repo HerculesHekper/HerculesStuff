@@ -6,7 +6,7 @@ ATTENTION : As Variables are stored as a whole in Herc database, if character qu
 
 SELECT 
 SUM(`char_reg_num_db`.value) AS `NB_VAR`
-,`char`.`guild_id`
+,`guild`.`guild_id`
 ,`guild`.`Name`
 FROM `char_reg_num_db`
 LEFT JOIN `char` ON `char`.`char_id`=`char_reg_num_db`.`char_id`
