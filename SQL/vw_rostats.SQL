@@ -1,4 +1,4 @@
-CREATE VIEW vw_libertyrostats AS
+CREATE VIEW vw_rostats AS
 SELECT
 	(SELECT COUNT(`account_id`) FROM `login`) AS `Account_nb`
 	,(SELECT COUNT(`char_id`) FROM `char`) AS `Character_nb`
