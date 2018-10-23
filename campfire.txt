@@ -1,0 +1,97 @@
+//===== Hercules Script ======================================
+//= Campfire
+//===== By ===================================================
+//= Habilis
+//= With the help of Asheraf, Dastgir 
+//= and the whole Hercules community.
+//===== Version ==============================================
+//= 1.00 - June 22, 2018
+//  - Initial script by Habilis.
+//===== Description ==========================================
+//= An element of role play, a way to add functionality 
+//= to the item 7035 - Matchstick, To light a Capm Fire.
+//= A Campfire is a portable temporary regeneration NPC.
+//= OW, and it is configurable ;).
+//============================================================
+prt_fild08,138,364,0	script	Campfire#CF	4_BONFIRE,{
+
+	end;
+
+OnRefill:
+	getmapxy(.@map$, .@x, .@y, UNITTYPE_PC);
+	getmapxy(.@npc_map$, .@npc_x, .@npc_y, UNITTYPE_NPC);
+	if (.@map$ != .@npc_map$ || distance(.@npc_x, .@npc_y, .@x, .@y) > .refill_distance || !(issit())) {
+		@camp_fire_regen = 0;
+		@camp_fire_tick = 0;
+		end;
+	}
+	
+	if(@camp_fire_regen == 1) {
+		heal(.refillHP_rate, .refillSP_rate);
+	} else {
+		if(@camp_fire_tick >= .camp_fire_delay) {
+			@camp_fire_regen = 1;
+			@camp_fire_tick = 0;
+			dispbottom("You are feeling warm and cozy.");
+		} else {
+			@camp_fire_tick++;
+		}
+	}
+	end;
+
+OnTimer500:
+	getmapxy(.@npc_map$, .@npc_x, .@npc_y, UNITTYPE_NPC);
+	.@count = getunits(BL_PC, .@units[0], false, .@npc_map$, (.@npc_x - .refill_distance),
+		(.@npc_y - .refill_distance), (.@npc_x + .refill_distance), (.@npc_y + .refill_distance));
+
+	for (.@i = 0; .@i < .@count; ++.@i) {
+		addtimer(rand(.refill_timer),  strnpcinfo(NPC_NAME) + "::OnRefill", .@units[.@i]);
+	}
+
+	initnpctimer();
+	end;
+	
+OnRemoveDup:
+	deltimer(strnpcinfo(NPC_NAME) + "::OnRefill");
+	stopnpctimer();
+	duplicateremove(strnpcinfo(NPC_NAME));
+	end;
+
+OnPCLogoutEvent:
+	// getnpcdir is ugly hack, getnpcid shows error in map-server
+	if (getnpcdir(sprintf("Campfire#CF_%d", getcharid(CHAR_ID_CHAR))) != -1) {
+		duplicateremove(sprintf("Campfire#CF_%d", getcharid(CHAR_ID_CHAR)));
+	}
+	end;
+
+OnInit:
+	.refillHP_rate = 15;	// number of HP to give every refill
+	.refillSP_rate = 5;		// number of SP to give every refill
+	.refill_distance = 3;	// max distance from fire HP/SP regeneration will work
+	.camp_fire_delay = 5;	// Skip how many ticks before feel warm ;)
+	.refill_timer = 300;	// wait rand(X) ms before refil
+	initnpctimer();
+}
+
+function	script	F_CreateCFDup	{
+	
+	.@nofire_distance = 5;			// How far from other NPCs allowed to make fire.
+	.@fire_duration = 1000 * 60 * 3;// 3 minutes (How long will the Campfire last, in ms)
+	.@curr_char_id = getcharid(CHAR_ID_CHAR);
+	
+	getmapxy(.@mapname$, .@mapx, .@mapy, UNITTYPE_PC);
+
+	if(getnpcdir(sprintf("Campfire#CF_%d", .@curr_char_id)) != -1) {
+		deltimer(sprintf("Campfire#CF_%d::OnRemoveDup", .@curr_char_id));
+		duplicateremove(sprintf("Campfire#CF_%d", .@curr_char_id));
+	}
+	
+	if(getunits(BL_NPC, .@units[0], false, .@mapname$, (.@mapx - .@nofire_distance),(.@mapy - .@nofire_distance), (.@mapx + .@nofire_distance), (.@mapy + .@nofire_distance)) > 0) {
+		dispbottom("A fire cannot be started here.");
+	} else {
+		soundeffect ("strike-matchstick.wav",0);
+		duplicatenpc("Campfire#CF", "Campfire", sprintf("CF_%d", .@curr_char_id), .@mapname$, .@mapx, .@mapy, 0);
+		addtimer(.@fire_duration, sprintf("Campfire#CF_%d::OnRemoveDup", .@curr_char_id));
+	}
+	return();
+}
