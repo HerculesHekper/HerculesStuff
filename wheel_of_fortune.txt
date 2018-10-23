@@ -1,0 +1,238 @@
+//===== Hercules Script ======================================
+//= Wheel of Fortune
+//===== By ===================================================
+//= Habilis
+//= Edited by Myriad
+//===== Version ==============================================
+//= 1.02 - June 15, 2018
+//  - Made the script work with zeny, to be more accesibly to everyone.
+//= 1.01 - June 14, 2018
+//	- Added @wheel_of_fortune GM command (level 98+).
+//	- Merged S_Pay and S_Loop subs into main line of text.
+//	- S_Gamble is now S_Spin and it will 'return' instead of
+//	calling back to the initial sub.
+//= 1.00 - June 13, 2018
+//	- Initial script edit for Habilis.
+//===== Description ==========================================
+//= Wheel of fortune something.
+//============================================================
+
+-	script	Wheel_of_Fortune	FAKE_NPC ,{
+
+OnInit:
+	disablenpc("Wheel of Fortune#Main");
+	disablenpc("Hussein#WOF");
+	.EventName$ = "[Wheel Of Fortune]";
+	end;
+
+
+OnClock0800:
+OnClock1200:
+OnClock1600:
+OnClock2000:
+OnClock2200:
+OnStart:
+	.Start = true;
+	announce(sprintf("%s : The event will begin in 1 minute, near the center of Prontera.", .EventName$), bc_blue | bc_all);
+	initnpctimer();
+	end;
+
+OnTimer60000: // 1 min
+	enablenpc("Wheel of Fortune#Main");
+	enablenpc("Hussein#WOF");
+	announce(sprintf("%s : Come to Prontera and test your luck", .EventName$), bc_blue | bc_all);
+	end;
+
+OnTimer1800000: // 30 mins
+	announce(sprintf("%s : One more minute, do your last spin!", .EventName$), bc_blue | bc_all);
+	end;
+
+OnTimer1860000: // 31 mins
+OnStop:
+	.Start = false;
+	stopnpctimer();
+	disablenpc("Wheel of Fortune#Main");
+	disablenpc("Hussein#WOF");
+	end;
+
+OnCommand:
+	if (.@atcmd_numparameters != 1) {
+		dispbottom(sprintf("Usage: %s <start/end>", .@atcmd_command$), 0x00FF00);
+		dispbottom(sprintf("%s failed.", .@atcmd_command$), 0x00FF00);
+		end;
+	}
+
+	if (.@atcmd_parameters$[0] == "start") {
+		if (!.Start)
+			donpcevent(sprintf("%s::OnStart", strnpcinfo(NPC_NAME)));
+		else {
+			dispbottom("The Wheel of Fortune has already started.", 0x00FF00);
+			dispbottom(sprintf("%s failed.", .@atcmd_command$), 0x00FF00);
+		}
+	} else if (.@atcmd_parameters$[0] == "end") {
+		if (.Start)
+			donpcevent(sprintf("%s::OnEnd", strnpcinfo(NPC_NAME)));
+		else {
+			dispbottom("The Wheel of Fortune is not active.", 0x00FF00);
+			dispbottom(sprintf("%s failed.", .@atcmd_command$), 0x00FF00);
+		}
+	} else {
+		dispbottom(sprintf("Usage: %s <start/end>", .@atcmd_command$), 0x00FF00);
+		dispbottom(sprintf("%s failed.", .@atcmd_command$), 0x00FF00);
+	}
+	end;
+}
+
+prontera,155,176,3	script	Wheel of Fortune#Main	2_SLOT_MACHINE,{
+	
+OnTalk:
+	if (Zeny < .Zeny_Cost && #freewheelfortunespin < 0) {
+		mesf("[^0055FF%s^000000]", .EventName$);
+		mes("You are out of Zeny");
+		mes("and have no more");
+		mes("free spins. Come back");
+		mes("next time for more!");
+		close();
+	}
+
+	.@mes$ = (#freewheelfortunespin > 0) ? sprintf(", but you, my friend, have %d free spin%s!", #freewheelfortunespin, (#freewheelfortunespin == 1) ? "" : "s") : ".";
+	cutin("aca_salim02", 2);
+	addtimer(1, sprintf("%s::OnEnd", strnpcinfo(NPC_NAME)));
+	mesf("[^0055FF%s^000000]", .EventName$);
+	mes("Do you want to spin the wheel?");
+	mesf("It costs ^FF0000%d Zeny^000000 to play%s", .Zeny_Cost, .@mes$);
+	next();
+
+	while (true) {
+		if (Zeny < .Zeny_Cost && #freewheelfortunespin < 0)
+			callsub(S_End);
+		switch (select(
+			(#freewheelfortunespin > 0) ? sprintf("Yes! Use free spin! (%d left)", #freewheelfortunespin) : "",
+			(Zeny >= .Zeny_Cost ) ? sprintf("Yes! Use Zeny. (costs %dz)", .Zeny_Cost) : "",
+			"No (Leave)"
+		)) {
+		// pay with free spin
+		case 1:
+			if (#freewheelfortunespin > 0) {
+				if ((#freewheelfortunespin -= 1) < 0)
+					#freewheelfortunespin = 0;
+				callsub(S_Spin);
+			} else
+				callsub(S_End);
+			break;
+
+		// Pay with zeny
+		case 2:
+			if (Zeny >= .Zeny_Cost) {
+			    Zeny -= .Zeny_Cost;
+				callsub(S_Spin);
+			} else {
+				cutin("aca_salim02", 2);
+				mesf("[^0055FF%s^000000]", .EventName$);
+				mes("Awww, you don't have enough to gamble...");
+				mes(" ");
+				mes("Have you ever heard?");
+				mes("'Money isn't all that matters' Got it?");
+				mes("Byeeeeeeeeeeeeee ;)");
+				callsub(S_End);
+			}
+			break;
+
+		default:
+			callsub(S_End);
+		}
+	}
+
+// Wheel spin animation
+S_Spin:
+	.@Sector = rand(.Sector_Range[0], .Sector_Range[1]);
+	.@Display = .@Sector * 2 - 1;
+	.@Speed = .Spin_Speed;
+	
+	for (.@i = 0; .@i < .nbTurns; .@i++) {
+		.@b = .Cutin_Range[0];
+		while (.@b <= .Cutin_Range[1]) {
+			cutin(sprintf("%s%d", .Cutin$, .@b), 4);
+			sleep2(.@Speed);
+			.@b++;
+			.@Speed += 1; // not ++, because  you may want to adjust the stopping +1 +2 +3
+		}
+	}
+	
+	.@b = .Cutin_Range[0];
+	while (.@b < .@Display) {
+		cutin(sprintf("%s%d", .Cutin$, .@b), 4);
+		sleep2(.@Speed);
+		.@b++;
+	}
+
+	cutin(sprintf("%s%d", .Cutin$, .@b), 4);
+
+	if (.Prize_ID[.@Sector] == -1) {
+		// Free spin
+		if (.Sound_Effects)
+			soundeffect("wheel_jackpot.wav", 0);
+		announce(sprintf("[%s] : Wow, %dx more Free spins!!!", .EventName$, .Prize_Qty[.@Sector]), bc_blue | bc_self);
+		#freewheelfortunespin = #freewheelfortunespin == 0 ? .Prize_Qty[.@Sector] : #freewheelfortunespin + .Prize_Qty[.@Sector];
+	} else if (.Prize_ID[.@Sector] == 0) {
+		// Nothing
+		if (.Sound_Effects)
+			soundeffect("wheel_lost.wav", 0);
+		announce(sprintf("[%s] : Awwww, no luck in your gamble, more luck in love...", .EventName$), bc_blue | bc_self);
+	} else { 
+		// Item
+		if (.Sound_Effects)
+			soundeffect("wheel_won.wav", 0);
+		announce(sprintf("[%s] : %dx %s - enjoy your prize!", .EventName$, .Prize_Qty[.@Sector], getitemname(.Prize_ID[.@Sector])), bc_blue | bc_self);
+		getitem(.Prize_ID[.@Sector], .Prize_Qty[.@Sector]);
+	}
+
+	sleep2(1000);
+	if (Zeny < .Zeny_Cost && #freewheelfortunespin < 0) {
+		mesf("[^0055FF%s^000000]", .EventName$);
+		mes("You are out of Zeny");
+		mes("and have no more");
+		mes("free spins. Come back");
+		mes("next time for more!");
+		close();
+	}
+	return;
+	
+S_End:
+	close2();
+OnEnd:
+	cutin("", 255);
+	end;
+	
+OnInit:
+	.EventName$ = "Wheel Of Fortune";
+	bindatcmd("wheel_of_fortune", "Wheel_of_Fortune::OnCommand", 98, 98, false);
+	.Spin_Speed = 50; // What is the base spin speed? (ms)
+	.nbTurns = 2; // How many times the arrow makes a complete turn, before entering the stopping routine
+	.Zeny_Cost = 10000; // How much zeny does it cost for a spin?
+	.Sound_Effects = true; // Enable sound effects? (true/false)
+
+	// You must have a total of 10 prizes. DO NOT remove 0 or -1 from the array and do not
+	// change their order.
+	setarray(.Prize_ID[1], -1, 12103, 13277, 12187,   617,   607, 12186,   604, 0,  7040);
+	setarray(.Prize_Qty[1], 2,     1,     1,     1,     3,     3,     1,     3, 0,     3);
+
+	// Don't touch below
+	.Cutin$ = "WheelOfFortune_";
+	setarray(.Sector_Range, 1, 10); // Sector range
+	setarray(.Cutin_Range, 0, 19); // Cutin range
+	end;
+}
+
+prontera,159,178,3	script	Hussein#WOF	1_M_MERCHANT,{
+	.@name$ = "[Hussein]";
+	cutin("aca_salim02", 2);
+	mes(.@name$);
+	mes("I command you to spin");
+	mes("the Wheel of Fortune!");
+	next();
+	getmapxy(.@map$, .@x, .@y, UNITTYPE_NPC, "Wheel of Fortune#Main");
+	warp(.@map$, .@x - 1, .@y - 2, 0);
+	doevent("Wheel of Fortune#Main::OnTalk");
+	end;
+}
