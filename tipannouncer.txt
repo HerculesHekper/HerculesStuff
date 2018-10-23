@@ -1,0 +1,24 @@
+-	script	lrotipAnnouncer	FAKE_NPC,{
+    
+    OnTimer600000: // 10 * 60 * 1000
+	    setnpctimer(0);
+	    if(!agitcheck() && !agitcheck2()){
+	        AnnounceColor(sprintf("Tip: %s", .News$[rand(1,getarraysize(.News$) - 1)]), "LBLUE");
+	    }
+	end;
+	
+	OnInit:
+	    setarray .News$[1],	// Random Message to be Broadcasted		
+            "Server administration will never ask you for your login & password.",		
+            "Don't join any kind of groups or discord channels offering you a GM position.",
+            "Believe only the official information announced on our forum & discord.",
+            "Report all bugs and illegal activity to the forum.",
+            "Please, take the time to review us on RMS, it helps to bring more new players!",
+            "Usage of prohibited 3d party software, such as AHK/RoMed or others, will get you banned.",
+            "Any kind of Real Money Trading (RMT), is prohibitrd and will get you banned.",
+            "You are the only one responsible for your account and items, don't share your account.";
+            
+        initnpctimer();
+	end;
+	
+}
